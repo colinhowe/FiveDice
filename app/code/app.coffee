@@ -1,9 +1,10 @@
-HelloWidget = require './hello/Hello'
+require 'pusher'
+PerudoWidget = require './perudo/Perudo'
 
 document.addEventListener('DOMContentLoaded', ->
-    hello = HelloWidget.create({"el": document.getElementById("hello")})
-    hello.run()
+    console.log Pusher
+    game = PerudoWidget.create({"el": document.getElementById("game")})
 
     # Debugging and tinkering interface
-    window.hello = hello
+    window.game = game
 )

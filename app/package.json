@@ -28,6 +28,7 @@
     "react": "^0.10.0",
     "reactify": "^0.13.1",
     "through2": "^0.5.1",
+    "underscore": "^1.6.0",
     "vinyl-source-stream": "^0.1.1",
     "watchify": "git://github.com/colinhowe/watchify.git#master",
     "yargs": "^1.2.3"
@@ -47,7 +48,8 @@
   },
   "browser": {
     "gridster": "./node_modules/gridster/dist/jquery.gridster.js",
-    "highcharts": "./code/lib/highcharts.js"
+    "highcharts": "./code/lib/highcharts.js",
+    "pusher": "./lib/pusher.min.js"
   },
   "browserify": {
     "transform": [
@@ -66,6 +68,9 @@
       "depends": [
         "jquery:jQuery"
       ]
+    },
+    "pusher": {
+      "exports": null
     }
   }
 }

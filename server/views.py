@@ -36,7 +36,7 @@ def game_list(request):
         "games": [
             g.to_dict()
             for g in Game.objects.filter(
-                status__in=[WAITING_FOR_PLAYERS]).order_by('id')
+                status__in=[WAITING_FOR_PLAYERS, RUNNING]).order_by('id')
         ]
     })
 
@@ -167,6 +167,8 @@ def game_do_turn(request, pk, secret):
                 "You can't call %s on the first turn of the round!" % gamble)
         else:
             getattr(game, "do_" + gamble)()
+            if game.status != OVER:
+                game.roll_all_dice()
     elif not re.match(r'^[0-9]+,[1-6]$', gamble):
         return _json_error(
             "'gamble' format is invalid. Format is '11,6' to "
@@ -189,9 +191,6 @@ def game_do_turn(request, pk, secret):
                     "Either the number of dice or the value must go up!")
             else:
                 game.do_gamble(gamble)
-
-    if game.status != OVER:
-        game.roll_all_dice()
 
     _push_game_state_to_clients(request, game, "game_do_turn")
 
