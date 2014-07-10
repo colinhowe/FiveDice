@@ -3,6 +3,7 @@ import re
 
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.core.urlresolvers import reverse
+from django.shortcuts import render_to_response
 
 from server import (
     WAITING_FOR_PLAYERS, RUNNING, OVER, split_ints, jsonified_exceptions)
@@ -209,3 +210,6 @@ def game_quit(request, pk, secret):
     _push_game_state_to_clients(request, game, "game_quit")
 
     return _json_response(True)
+
+def index(request):
+    return render_to_response('index.html', {})

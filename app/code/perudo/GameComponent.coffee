@@ -30,9 +30,6 @@ GameComponent = React.createClass({
         console.log newState
         @setState(newState)
 
-    handleGoToLobby: (e) ->
-        @props.handleGoToLobby()
-
     setGameState: (gameData) ->
         @gameId = gameData.game.id
         inProgress = if gameData.player then true else false
@@ -106,7 +103,6 @@ GameComponent = React.createClass({
             </div>
 
         return <div>
-                <button onClick={@props.handleGoToLobby}>Back</button>
                 <ul>{ playerNodes }</ul>
                 <h2>Round { @state.round }</h2>
                 { joinBlock }

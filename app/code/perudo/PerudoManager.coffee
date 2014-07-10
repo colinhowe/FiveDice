@@ -2,6 +2,8 @@ require 'pusher'
 
 $ = require 'jquery'
 React = require 'react'
+hasher = require 'hasher'
+crossroads = require 'crossroads'
 
 LobbyComponent = require './LobbyComponent'
 GameComponent = require './GameComponent'
@@ -10,12 +12,35 @@ class PerudoManager
 
     constructor: (options) ->
         @el = options.el
+        @_respondToHashChange = true
 
         @pusher = new Pusher('fe78125e095d7477da6e')
-        @loadLobby()
         # @channel = @pusher.subscribe('fivedice.game.2');
 
-    loadLobby: () =>
+        @_initRoutes()
+
+    _initRoutes: () ->
+        crossroads.addRoute('', @loadLobby)
+        crossroads.addRoute('game/{id}/', @loadGame)
+        crossroads.ignoreState = true
+         
+        # Setup hasher
+        parseHash = (newHash, oldHash) =>
+          if @_respondToHashChange
+            crossroads.parse(newHash)
+
+        hasher.initialized.add(parseHash) # parse initial hash
+        hasher.changed.add(parseHash) # parse hash changes
+        hasher.init() # start listening for history change
+        
+    _setUrlHash: (hash) =>
+      # Disable hasher temporarily to stop us getting a change signal
+      @_respondToHashChange = false
+      hasher.setHash(hash)
+      @_respondToHashChange = true
+
+    loadLobby: =>
+        @_setUrlHash('')
         $.getJSON('/game/lobby', @lobbyLoaded)
 
     loadGame: (gameId) =>
@@ -42,10 +67,11 @@ class PerudoManager
 
     gameLoaded: (data) =>
         @pusher.subscribe('fivedice.game.'+data.game.id)
-        @component = PerudoComponent({
-            handleGoToLobby: @loadLobby, initialGame: data,
+        @component = GameComponent({
+            initialGame: data,
             pusher: @pusher,
         })
+        @_setUrlHash("game/#{data.game.id}")
         React.renderComponent(@component, @el)
 
     onCreateGame: (nick, numPlayers) =>

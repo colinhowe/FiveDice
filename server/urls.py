@@ -5,6 +5,7 @@ from server import views
 
 urlpatterns = patterns(
     '',
+    url(r'^app/.*$', views.index),
     url(r'^game/lobby$', views.game_list),
     url(r'^game/rankings$', views.game_rankings),
 
