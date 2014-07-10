@@ -1,4 +1,4 @@
-View = require './LobbyGameRowView.jsx'
+React = require 'react'
 
 LobbyGameRow = React.createClass({
   ###
@@ -12,7 +12,18 @@ LobbyGameRow = React.createClass({
   handleClick: (e) ->
     @props.onGameSelected(@props.key)
 
-  render: View.render
+  render: ->
+    joinType = "Spectate"
+    if @props.secret
+        joinType = "Play"
+    gameState = @props.game.status
+    gameStateMsg = {
+        1: "Waiting for players",
+        2: "In progress"
+    }[gameState]
+    return <div><button onClick={ @handleClick }>
+        {joinType} Game { @props.game.key } {gameStateMsg}
+    </button></div>
 })
 
 module.exports = LobbyGameRow

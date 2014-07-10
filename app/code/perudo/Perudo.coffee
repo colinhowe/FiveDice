@@ -3,8 +3,8 @@ require 'pusher'
 $ = require 'jquery'
 React = require 'react'
 
-template = require './perudo.jsx'
-lobbyTemplate = require './lobby.jsx'
+Dice = require './Dice'
+LobbyGameRow = require './LobbyGameRow'
 
 PerudoComponent = React.createClass({
     onEventPushed: (eventName, data) ->
@@ -80,7 +80,45 @@ PerudoComponent = React.createClass({
         @props.pusher.bind_all(@onEventPushed)
         @setGameState(@props.initialGame)
 
-    render: template.render
+    render: ->
+        playerNodes = @state.players.map((player) ->
+            return <li key={player.nick}>{player.nick}</li>
+        )
+        if @state.canJoin
+            joinBlock = <div>
+                <input type="text" ref="nick" placeholder="Your nick" />
+                <button onClick={@onJoin}>Join game</button>
+            </div>
+        else
+            joinBlock = null
+
+        diceBlock = null
+        turnBlock = null
+        if @state.inProgress
+            diceBlock = <Dice dice={@state.dice} />
+            if @state.yourTurn
+                turnBlock = <div>
+                    <input ref="quantity" type="number" placeholder="number of dice" />
+                    <input ref="value" type="number" placeholder="value of dice" />
+                    <button onClick={@doGamble}>Gamble</button>
+                    <button onClick={@doBullshit}>Call Bullshit</button>
+                </div>
+
+        lastGambleBlock = null
+        if @state.lastGamble
+            lastGambleBlock = <div>
+                <p>Last gamble was {@state.lastGamble.quantity} {@state.lastGamble.value}s</p>
+            </div>
+
+        return <div>
+                <button onClick={@props.handleGoToLobby}>Back</button>
+                <ul>{ playerNodes }</ul>
+                <h2>Round { @state.round }</h2>
+                { joinBlock }
+                { diceBlock }
+                { lastGambleBlock }
+                { turnBlock }
+            </div>
 
     onJoin: ->
         nick = @refs.nick.getDOMNode().value.trim()
@@ -130,8 +168,20 @@ LobbyComponent = React.createClass({
     handleGameChange: (gameId) ->
         @props.onGameSelected(gameId)
 
-    render: lobbyTemplate.render
-
+    render: ->
+        gameNodes = @state.games.map((game) =>
+            return <LobbyGameRow
+                key={game.key}
+                game={game}
+                onGameSelected={ @handleGameChange }/>
+        )
+        return <div>
+            <input type="text" placeholder="Your name" ref="nick" />
+            <input type="number" placeholder="Number of players" ref="numPlayers" />
+            <button onClick={@onCreateGame}>Create Game</button>
+            <div>{ gameNodes }</div>
+        </div>
+      
     onCreateGame: ->
         nick = @refs.nick.getDOMNode().value.trim()
         numPlayers = parseInt(@refs.numPlayers.getDOMNode().value.trim())

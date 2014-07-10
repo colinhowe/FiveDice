@@ -19,8 +19,6 @@
 
 var browserify = require('browserify');
 var clean = require('gulp-clean');
-var coffeeify = require('coffeeify');
-// var compass = require('gulp-compass');
 var sass = require('gulp-sass');
 var convertSourceMap = require('convert-source-map')
 var es = require('event-stream');
@@ -28,6 +26,7 @@ var fs = require('fs');
 var gulp = require('gulp');
 var gutil = require('gulp-util');
 var path = require('path');
+var coffee_reactify = require('coffee-reactify');
 var reactify = require('reactify');
 var rename = require('gulp-rename');
 var source = require('vinyl-source-stream')
@@ -142,7 +141,7 @@ var compileBundle = function(watch) {
     } else {
       bundler = browserify(sourcePath, browserifyOptions);
     }
-    bundler.transform(coffeeify);
+    bundler.transform(coffee_reactify);
     bundler.transform(reactify);
     bundler.transform(browserifyShim);
 
