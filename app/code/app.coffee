@@ -1,9 +1,7 @@
-require 'pusher'
-PerudoWidget = require './perudo/Perudo'
+PerudoManager = require './perudo/PerudoManager'
 
 document.addEventListener('DOMContentLoaded', ->
-    console.log Pusher
-    game = PerudoWidget.create({"el": document.getElementById("game")})
+    game = new PerudoManager({"el": document.getElementById("game")})
 
     # Debugging and tinkering interface
     window.game = game
