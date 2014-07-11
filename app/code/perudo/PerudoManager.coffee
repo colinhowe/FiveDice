@@ -12,7 +12,6 @@ class PerudoManager
 
     constructor: (options) ->
         @el = options.el
-        @_respondToHashChange = true
 
         @pusher = new Pusher('fe78125e095d7477da6e')
         # @channel = @pusher.subscribe('fivedice.game.2');
@@ -26,21 +25,23 @@ class PerudoManager
          
         # Setup hasher
         parseHash = (newHash, oldHash) =>
-          if @_respondToHashChange
-            crossroads.parse(newHash)
+          crossroads.parse(newHash)
 
         hasher.initialized.add(parseHash) # parse initial hash
         hasher.changed.add(parseHash) # parse hash changes
         hasher.init() # start listening for history change
         
     _setUrlHash: (hash) =>
-      # Disable hasher temporarily to stop us getting a change signal
-      @_respondToHashChange = false
-      hasher.setHash(hash)
-      @_respondToHashChange = true
+        hasher.setHash(hash)
+
+    goToLobby: =>
+        console.log 'setting hash'
+        @_setUrlHash('')
+
+    goToGame: (id) =>
+        @_setUrlHash("game/#{id}")
 
     loadLobby: =>
-        @_setUrlHash('')
         $.getJSON('/game/lobby', @lobbyLoaded)
 
     loadGame: (gameId) =>
@@ -60,7 +61,7 @@ class PerudoManager
 
         React.unmountComponentAtNode(@el)
         @component = new LobbyComponent({
-            onGameSelected: @loadGame,
+            onGameSelected: @goToGame,
             onCreateGame: @onCreateGame,
             games: games})
         React.renderComponent(@component, @el)
@@ -68,10 +69,10 @@ class PerudoManager
     gameLoaded: (data) =>
         @pusher.subscribe('fivedice.game.'+data.game.id)
         @component = GameComponent({
+            handleGoToLobby: @goToLobby,
             initialGame: data,
             pusher: @pusher,
         })
-        @_setUrlHash("game/#{data.game.id}")
         React.renderComponent(@component, @el)
 
     onCreateGame: (nick, numPlayers) =>

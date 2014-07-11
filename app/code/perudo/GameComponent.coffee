@@ -27,7 +27,6 @@ GameComponent = React.createClass({
             $.getJSON(url, @setGameState)
             return
 
-        console.log newState
         @setState(newState)
 
     setGameState: (gameData) ->
@@ -67,8 +66,6 @@ GameComponent = React.createClass({
         @player = null
         if @props.initialGame.player
             @playerId = @props.initialGame.player.number
-            console.log 'setting player'
-            console.log @playerId
         @props.pusher.bind_all(@onEventPushed)
         @setGameState(@props.initialGame)
 
@@ -103,6 +100,7 @@ GameComponent = React.createClass({
             </div>
 
         return <div>
+                <button onClick={@props.handleGoToLobby}>Back</button>
                 <ul>{ playerNodes }</ul>
                 <h2>Round { @state.round }</h2>
                 { joinBlock }
