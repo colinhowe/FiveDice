@@ -1,77 +1,74 @@
+$ = require 'jquery'
 React = require 'react'
+
 Dice = require './Dice'
+GameStore = require './GameStore'
 
 GameComponent = React.createClass({
     onEventPushed: (eventName, data) ->
-        data = JSON.parse(data)
-        player = data.player
-        newState = {
-            players: data.game.players
-        }
-        if player
-            newState.player = player
+      console.log 'pushed'
+      console.log data
+      if typeof data == "object"
+        console.log 'early bail'
+        return
+      data = JSON.parse(data)
+      # TODO round changes
+      currentRound = @game.round
+      new GameStore().updateGameWithNewData(@game, data)
+      console.log '-- got game'
+      console.log @game
+      if @game.round != currentRound
+        console.log 'Need to get new dice'
 
-        if @playerId
-            newState.yourTurn = data.game.player_turn == @playerId
+      @syncState()
 
-        if data.game.last_gamble
-            [quantity, value] = data.game.last_gamble.split(',')
-            newState.lastGamble = {
-                quantity: parseInt(quantity),
-                value: parseInt(value)
-            }
+    syncState: ->
+        @gameId = @game.id
 
-        if data.game.round != @round
-            # New round! get dice
-            url = "/game/#{@gameId}/#{@secret}"
-            $.getJSON(url, @setGameState)
-            return
-
-        @setState(newState)
-
-    setGameState: (gameData) ->
-        @gameId = gameData.game.id
-        inProgress = if gameData.player then true else false
+        inProgress = @game.inProgress()
         yourTurn = false
-        if inProgress
-            dice = gameData.player.dice.split(",")
-            dice = dice.map((d) -> parseInt(d))
-            yourTurn = gameData.player.number == gameData.game.player_turn
+        if @localPlayerId and inProgress
+            yourTurn = @localPlayerId == @game.currentPlayer.id
 
         lastGamble = null
-        if gameData.game.last_gamble
+        if @game.last_gamble
             [quantity, value] = gameData.game.last_gamble.split(',')
             lastGamble = {
                 quantity: parseInt(quantity),
                 value: parseInt(value)
             }
 
-        @setState({
+        if @localPlayerId
+          localPlayer = @game.players[@localPlayerId]
+        newState = {
             inProgress: inProgress,
-            dice: dice,
-            player: gameData.player,
-            players: gameData.game.players,
+            dice: @dice,
+            localPlayer: localPlayer,
+            currentPlayer: @game.currentPlayer,
+            players: (player for _, player of @game.players),
             canJoin: not inProgress,
             yourTurn: yourTurn,
             lastGamble: lastGamble,
-            round: gameData.game.round})
+            round: @game.round
+        }
+        @setState(newState)
 
     getInitialState: ->
         return {msg: 'No message yet'}
 
     componentWillMount: ->
-        @round = @props.initialGame.game.round
-        @gameId = @props.initialGame.game.id
+        @game = @props.game
+        @dice = @props.dice
+        @round = @game.round
+        @gameId = @game.id
+        @localPlayerId = @props.localPlayerId
         @secret = localStorage["game:#{@gameId}:secret"]
-        @player = null
-        if @props.initialGame.player
-            @playerId = @props.initialGame.player.number
         @props.pusher.bind_all(@onEventPushed)
-        @setGameState(@props.initialGame)
+        @syncState()
 
     render: ->
         playerNodes = @state.players.map((player) ->
-            return <li key={player.nick}>{player.nick}</li>
+          <li key={player.nick}>{player.nick}</li>
         )
         if @state.canJoin
             joinBlock = <div>
@@ -85,7 +82,7 @@ GameComponent = React.createClass({
         turnBlock = null
         if @state.inProgress
             diceBlock = <Dice dice={@state.dice} />
-            if @state.yourTurn
+            if @state.localPlayer == @state.currentPlayer
                 turnBlock = <div>
                     <input ref="quantity" type="number" placeholder="number of dice" />
                     <input ref="value" type="number" placeholder="value of dice" />
@@ -114,7 +111,7 @@ GameComponent = React.createClass({
         onSuccess = (data) =>
             @secret = data.player.secret
             localStorage["game:#{data.game.id}:secret"] = @secret
-            @setGameState(data)
+            @syncState()
         args = {
             nick: nick
         }
@@ -127,16 +124,15 @@ GameComponent = React.createClass({
         url = "/game/#{@gameId}/#{@secret}/do_turn"
         arg = "gamble=#{quantity},#{value}"
         onSuccess = (data) =>
-            # Do some state
-            console.log data
-        $.post(url, arg, onSuccess, "text")
+          new GameStore().updateGameWithNewData(@game, data)
+          @syncState()
+        $.post(url, arg, onSuccess, "json")
 
     doBullshit: ->
         url = "/game/#{@gameId}/#{@secret}/do_turn"
         arg = "gamble=bullshit"
         onSuccess = (data) =>
             # Do some state
-            console.log data
         $.post(url, arg, onSuccess, "text")
 })
 

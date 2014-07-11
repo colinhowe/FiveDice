@@ -7,13 +7,14 @@ crossroads = require 'crossroads'
 
 LobbyComponent = require './LobbyComponent'
 GameComponent = require './GameComponent'
+GameStore = require './GameStore'
 
 class PerudoManager
 
     constructor: (options) ->
         @el = options.el
 
-        @pusher = new Pusher('fe78125e095d7477da6e')
+        @pusher = new Pusher('e913cbc1d7c563bff2c0')
         # @channel = @pusher.subscribe('fivedice.game.2');
 
         @_initRoutes()
@@ -45,11 +46,8 @@ class PerudoManager
         $.getJSON('/game/lobby', @lobbyLoaded)
 
     loadGame: (gameId) =>
-        url = '/game/' + gameId
         secret = localStorage["game:#{gameId}:secret"]
-        if secret
-            url += "/#{secret}"
-        $.getJSON(url, @gameLoaded)
+        new GameStore().fetchById(gameId, secret, @gameLoaded)
 
     lobbyLoaded: (data) =>
         games = []
@@ -66,11 +64,14 @@ class PerudoManager
             games: games})
         React.renderComponent(@component, @el)
 
-    gameLoaded: (data) =>
-        @pusher.subscribe('fivedice.game.'+data.game.id)
+    gameLoaded: (game, dice, localPlayerId) =>
+        window.pusher = @pusher
+        @pusher.subscribe("fivedice.game.#{game.id}")
         @component = GameComponent({
             handleGoToLobby: @goToLobby,
-            initialGame: data,
+            game: game,
+            dice: dice,
+            localPlayerId: localPlayerId,
             pusher: @pusher,
         })
         React.renderComponent(@component, @el)
