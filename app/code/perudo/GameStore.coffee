@@ -10,47 +10,29 @@ class GameStore
     $.getJSON(url, (data) =>
       game = new GameModel()
       @_parseGame(game, gameSecret, data)
+      if data.player?.dice
+        dice = data.player.dice.split(",")
+        dice = dice.map((d) -> parseInt(d))
+      if data.player
+        localPlayerId = data.player.number
+      onSuccess(game, dice, localPlayerId)
+    )
+
+  fetchNewDice: (game, onSuccess) ->
+    url = "/game/#{game.id}/#{game.secret}"
+    $.getJSON(url, (data) =>
+      @_parseGame(game, null, data)
       if data.player
         dice = data.player.dice.split(",")
         dice = dice.map((d) -> parseInt(d))
-        localPlayerId = data.player.number
-      onSuccess(game, dice, localPlayerId)
+        onSuccess(dice)
     )
 
   updateGameWithNewData: (game, data) ->
     @_parseGame(game, null, data)
 
-    ###
-    newState = {
-        players: data.game.players
-    }
-    if player
-        newState.player = player
-
-    if @playerId
-        newState.yourTurn = data.game.player_turn == @playerId
-
-    if data.game.last_gamble
-        [quantity, value] = data.game.last_gamble.split(',')
-        newState.lastGamble = {
-            quantity: parseInt(quantity),
-            value: parseInt(value)
-        }
-
-    if data.game.round != @round
-        # New round! get dice
-        url = "/game/#{@gameId}/#{@secret}"
-        $.getJSON(url, @syncState)
-        return
-
-    @setState(newState)###
-
   _parseGame: (game, gameSecret, data) ->
-    console.log 'parsing data'
-    console.log data
-
     players = {}
-    console.log typeof data
     for player in data.game.players
       player = @_parsePlayer(player)
       players[player.id] = player
@@ -69,6 +51,20 @@ class GameStore
     game.round = data.game.round
     game.currentPlayer = players[data.game.player_turn]
     game.status = data.game.status
+
+    if data.game.last_gamble == "bullshit"
+      game.lastGamble = null
+    else if data.game.last_gamble
+      [quantity, value] = data.game.last_gamble.split(',')
+      game.lastGamble = {
+        quantity: parseInt(quantity),
+        value: parseInt(value)
+      }
+    else
+      game.lastGamble = null
+
+    if data.game.player_won
+      game.winner = players[data.game.player_won]
 
   _parsePlayer: (playerData) ->
     return new PlayerModel(playerData.number, playerData.nick)

@@ -37,7 +37,7 @@ class Game(models.Model):
 
     @property
     def playing_players(self):
-        return self.player_set.filter(status=PLAYING)
+        return self.player_set.all()
 
     @property
     def ordered_players(self):

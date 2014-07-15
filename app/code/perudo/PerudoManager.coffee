@@ -15,7 +15,6 @@ class PerudoManager
         @el = options.el
 
         @pusher = new Pusher('e913cbc1d7c563bff2c0')
-        # @channel = @pusher.subscribe('fivedice.game.2');
 
         @_initRoutes()
 
@@ -36,7 +35,6 @@ class PerudoManager
         hasher.setHash(hash)
 
     goToLobby: =>
-        console.log 'setting hash'
         @_setUrlHash('')
 
     goToGame: (id) =>
@@ -58,7 +56,7 @@ class PerudoManager
             })
 
         React.unmountComponentAtNode(@el)
-        @component = new LobbyComponent({
+        @component = LobbyComponent({
             onGameSelected: @goToGame,
             onCreateGame: @onCreateGame,
             games: games})
@@ -66,7 +64,7 @@ class PerudoManager
 
     gameLoaded: (game, dice, localPlayerId) =>
         window.pusher = @pusher
-        @pusher.subscribe("fivedice.game.#{game.id}")
+        React.unmountComponentAtNode(@el)
         @component = GameComponent({
             handleGoToLobby: @goToLobby,
             game: game,

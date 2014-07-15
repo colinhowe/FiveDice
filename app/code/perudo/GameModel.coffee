@@ -11,8 +11,15 @@ class GameModel
 
   GAME_WAITING_PLAYERS = 1
   GAME_STARTED = 2
+  GAME_ENDED = 3
+
+  waitingForPlayers: ->
+    return @status == GAME_WAITING_PLAYERS
 
   inProgress: ->
     return @status == GAME_STARTED
+
+  won: ->
+    return @status == GAME_ENDED
 
 module.exports = GameModel
