@@ -4,6 +4,31 @@ React = require 'react'
 Dice = require './Dice'
 GameStore = require './GameStore'
 
+LastGambleComponent = React.createClass({
+  render: ->
+    return <div>
+        <p>Last gamble was {@props.lastGamble.quantity} {@props.lastGamble.value}s</p>
+    </div>
+})
+
+PlayerListComponent = React.createClass({
+  render: ->
+    playerNodes = @props.players.map((player) ->
+      <li key={player.nick}>{player.nick}</li>
+    )
+    return <ul>{ playerNodes }</ul>
+})
+
+GambleComponent = React.createClass({
+  render: ->
+    <div>
+      <input ref="quantity" type="number" placeholder="number of dice" />
+      <input ref="value" type="number" placeholder="value of dice" />
+      <button onClick={@props.doGamble}>Gamble</button>
+      <button onClick={@props.doBullshit}>Call Bullshit</button>
+    </div>
+})
+
 GameComponent = React.createClass({
     onEventPushed: (eventName, data) ->
       if typeof data == "object"
@@ -24,8 +49,6 @@ GameComponent = React.createClass({
       @syncState()
 
     syncState: ->
-        @gameId = @game.id
-
         inProgress = @game.inProgress()
         yourTurn = false
         if @localPlayerId and inProgress
@@ -43,36 +66,48 @@ GameComponent = React.createClass({
             yourTurn: yourTurn,
             lastGamble: @game.lastGamble,
             round: @game.round,
-            winner: @game.winner
+            winner: @game.winner,
+            loading: false
         }
         @setState(newState)
 
     getInitialState: ->
-        return {}
+        return {
+          loading: true
+        }
 
-    componentWillMount: ->
-        @game = @props.game
-        @dice = @props.dice
-        @round = @game.round
-        @gameId = @game.id
-        @localPlayerId = @props.localPlayerId
-        @secret = localStorage["game:#{@gameId}:secret"]
+    componentDidMount: ->
+      gameId = @props.id
+      secret = localStorage["game:#{gameId}:secret"]
+      @setProps({secret: secret})
 
-        @channel = "fivedice.game.#{@gameId}"
-        @pusher = @props.pusher
-        @pusher.subscribe(@channel)
-        @props.pusher.bind_all(@onEventPushed)
+      new GameStore().fetchById(gameId, secret, @gameLoaded)
 
-        @syncState()
+    gameLoaded: (game, dice, localPlayerId) ->
+      @game = game
+      @localPlayerId = localPlayerId
+      @dice = dice
+
+      channel = "fivedice.game.#{@props.id}"
+      pusher = @props.pusher
+      pusher.subscribe(channel)
+      pusher.bind_all(@onEventPushed)
+
+      @syncState()
 
     componentWillUnmount: ->
-        @props.pusher.unsubscribe(@channel)
-
+      channel = "fivedice.game.#{@props.id}"
+      @props.pusher.unsubscribe(channel)
 
     render: ->
-        playerNodes = @state.players.map((player) ->
-          <li key={player.nick}>{player.nick}</li>
-        )
+        if @state.loading
+          return <p>Loading...</p>
+
+        playerList = <PlayerListComponent players={@state.players} />
+
+        if @state.winner
+          winnerBlock = <h1>{ @state.winner.nick } has won!</h1>
+
         if @state.canJoin and not @state.localPlayer
           joinBlock = <div>
             <input type="text" ref="nick" placeholder="Your nick" />
@@ -81,46 +116,33 @@ GameComponent = React.createClass({
         else if @state.canJoin
           joinBlock = <p>Waiting for more players to join</p>
 
-        diceBlock = null
-        turnBlock = null
-        winnerBlock = null
-        
-        if @state.winner
-          winnerBlock = <h1>{ @state.winner.nick } has won!</h1>
-
         if @state.dice
             diceBlock = <Dice dice={@state.dice} />
             if @state.localPlayer == @state.currentPlayer
-                turnBlock = <div>
-                    <input ref="quantity" type="number" placeholder="number of dice" />
-                    <input ref="value" type="number" placeholder="value of dice" />
-                    <button onClick={@doGamble}>Gamble</button>
-                    <button onClick={@doBullshit}>Call Bullshit</button>
-                </div>
+                gambleBlock = <GambleComponent
+                  doGamble={@doGamble} doBullshit={@doBullshit} />
 
-        lastGambleBlock = null
         if @state.lastGamble
-            lastGambleBlock = <div>
-                <p>Last gamble was {@state.lastGamble.quantity} {@state.lastGamble.value}s</p>
-            </div>
+          lastGambleBlock = <LastGambleComponent lastGamble={@state.lastGamble} />
 
         return <div>
                 <button onClick={@props.handleGoToLobby}>Back</button>
-                <ul>{ playerNodes }</ul>
                 <h2>Round { @state.round }</h2>
+                { playerList }
                 { winnerBlock }
                 { joinBlock }
                 { diceBlock }
+                { gambleBlock }
                 { lastGambleBlock }
-                { turnBlock }
             </div>
 
     onJoin: ->
       nick = @refs.nick.getDOMNode().value.trim()
       onSuccess = (data) =>
-        @secret = data.player.secret
-        @game.secret = @secret
-        localStorage["game:#{data.game.id}:secret"] = @secret
+        secret = data.player.secret
+        @setProps({secret: secret})
+        @game.secret = secret
+        localStorage["game:#{data.game.id}:secret"] = secret
 
         gs = new GameStore()
         gs.updateGameWithNewData(@game, data)
@@ -129,13 +151,13 @@ GameComponent = React.createClass({
       args = {
         nick: nick
       }
-      url = "/game/#{@gameId}/join"
+      url = "/game/#{@props.id}/join"
       $.post(url, args, onSuccess, "json")
 
     doGamble: ->
         value = parseInt(@refs.value.getDOMNode().value.trim())
         quantity = parseInt(@refs.quantity.getDOMNode().value.trim())
-        url = "/game/#{@gameId}/#{@secret}/do_turn"
+        url = "/game/#{@props.id}/#{@props.secret}/do_turn"
         arg = "gamble=#{quantity},#{value}"
         onSuccess = (data) =>
           new GameStore().updateGameWithNewData(@game, data)
@@ -143,7 +165,7 @@ GameComponent = React.createClass({
         $.post(url, arg, onSuccess, "json")
 
     doBullshit: ->
-        url = "/game/#{@gameId}/#{@secret}/do_turn"
+        url = "/game/#{@props.id}/#{@props.secret}/do_turn"
         arg = "gamble=bullshit"
         onSuccess = (data) =>
             # Do some state

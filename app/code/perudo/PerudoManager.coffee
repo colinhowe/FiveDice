@@ -15,6 +15,7 @@ class PerudoManager
         @el = options.el
 
         @pusher = new Pusher('e913cbc1d7c563bff2c0')
+        window.pusher = @pusher
 
         @_initRoutes()
 
@@ -44,8 +45,13 @@ class PerudoManager
         $.getJSON('/game/lobby', @lobbyLoaded)
 
     loadGame: (gameId) =>
-        secret = localStorage["game:#{gameId}:secret"]
-        new GameStore().fetchById(gameId, secret, @gameLoaded)
+      React.unmountComponentAtNode(@el)
+      @component = GameComponent({
+        id: gameId,
+        handleGoToLobby: @goToLobby,
+        pusher: @pusher,
+      })
+      React.renderComponent(@component, @el)
 
     lobbyLoaded: (data) =>
         games = []
@@ -60,18 +66,6 @@ class PerudoManager
             onGameSelected: @goToGame,
             onCreateGame: @onCreateGame,
             games: games})
-        React.renderComponent(@component, @el)
-
-    gameLoaded: (game, dice, localPlayerId) =>
-        window.pusher = @pusher
-        React.unmountComponentAtNode(@el)
-        @component = GameComponent({
-            handleGoToLobby: @goToLobby,
-            game: game,
-            dice: dice,
-            localPlayerId: localPlayerId,
-            pusher: @pusher,
-        })
         React.renderComponent(@component, @el)
 
     onCreateGame: (nick, numPlayers) =>
