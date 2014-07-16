@@ -29,7 +29,13 @@ class GameStore
     )
 
   updateGameWithNewData: (game, data) ->
-    @_parseGame(game, null, data)
+    # Create a new game and copy local data from the old game as we
+    # don't always get given that in updates
+    newGame = new GameModel()
+    newGame.localPlayer = game.localPlayer
+    newGame.secret = game.secret
+    @_parseGame(newGame, null, data)
+    return newGame
 
   _parseGame: (game, gameSecret, data) ->
     players = {}

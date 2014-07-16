@@ -33,6 +33,9 @@ GambleComponent = React.createClass({
     value = parseInt(@refs.value.getDOMNode().value.trim())
     quantity = parseInt(@refs.quantity.getDOMNode().value.trim())
     @props.doGamble(value, quantity)
+
+  doBullshit: ->
+    @props.doBullshit()
 })
 
 GameComponent = React.createClass({
@@ -43,24 +46,19 @@ GameComponent = React.createClass({
 
       currentRound = @state.game.round
       currentStatus = @state.game.status
-      new GameStore().updateGameWithNewData(@state.game, data)
+
+      @_syncGame(data)
+
       gameJustStarted = @state.game.status != currentStatus and @state.game.inProgress()
       if @state.game.round != currentRound or gameJustStarted
         new GameStore().fetchNewDice(@state.game, @gotNewDice)
-      else
-        @syncState()
+
+    _syncGame: (data) ->
+      game = new GameStore().updateGameWithNewData(@state.game, data)
+      @setState(game: game)
 
     gotNewDice: (dice) ->
-      @dice = dice
-      @syncState()
-
-    syncState: ->
-        newState = {
-            dice: @dice,
-            loading: false,
-            game: @state.game
-        }
-        @setState(newState)
+      @setState({dice: dice})
 
     getInitialState: ->
         return {
@@ -70,21 +68,17 @@ GameComponent = React.createClass({
     componentDidMount: ->
       gameId = @props.id
       secret = localStorage["game:#{gameId}:secret"]
-      @setProps({secret: secret})
+      @setState({secret: secret})
 
       new GameStore().fetchById(gameId, secret, @gameLoaded)
 
     gameLoaded: (game, dice, localPlayerId) ->
-      @setState({game: game})
-      @localPlayerId = localPlayerId
-      @dice = dice
+      @setState({loading: false, game: game, dice: dice})
 
-      channel = "fivedice.game.#{@props.id}"
+      channelName = "fivedice.game.#{@props.id}"
       pusher = @props.pusher
-      pusher.subscribe(channel)
-      pusher.bind_all(@onEventPushed)
-
-      @syncState()
+      channel = pusher.subscribe(channelName)
+      channel.bind_all(@onEventPushed)
 
     componentWillUnmount: ->
       channel = "fivedice.game.#{@props.id}"
@@ -132,13 +126,12 @@ GameComponent = React.createClass({
       nick = @refs.nick.getDOMNode().value.trim()
       onSuccess = (data) =>
         secret = data.player.secret
-        @setProps({secret: secret})
+        @setState({secret: secret})
         @state.game.secret = secret
         localStorage["game:#{data.game.id}:secret"] = secret
 
-        gs = new GameStore()
-        gs.updateGameWithNewData(@state.game, data)
-        gs.fetchNewDice(@state.game, @gotNewDice)
+        @_syncGame(data)
+        new GameStore().fetchNewDice(@state.game, @gotNewDice)
         
       args = {
         nick: nick
@@ -147,15 +140,12 @@ GameComponent = React.createClass({
       $.post(url, args, onSuccess, "json")
 
     doGamble: (value, quantity) ->
-        url = "/game/#{@props.id}/#{@props.secret}/do_turn"
+        url = "/game/#{@props.id}/#{@state.secret}/do_turn"
         arg = "gamble=#{quantity},#{value}"
-        onSuccess = (data) =>
-          new GameStore().updateGameWithNewData(@state.game, data)
-          @syncState()
-        $.post(url, arg, onSuccess, "json")
+        $.post(url, arg, @_syncGame, "json")
 
     doBullshit: ->
-        url = "/game/#{@props.id}/#{@props.secret}/do_turn"
+        url = "/game/#{@props.id}/#{@state.secret}/do_turn"
         arg = "gamble=bullshit"
         onSuccess = (data) =>
             # Do some state

@@ -125,7 +125,8 @@ class Game(models.Model):
         if winner_gains_die:
             winner.gain_a_die()
 
-        if self.playing_players.count() == 1:
+        alive_players = self.player_set.filter(status=PLAYING)
+        if alive_players.count() == 1:
             self.player_won = winner.number
             self.last_loser = loser.number
             self.last_gamble = gamble  # Log the winning gamble, for history

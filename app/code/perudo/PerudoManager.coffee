@@ -9,14 +9,11 @@ LobbyComponent = require './LobbyComponent'
 GameComponent = require './GameComponent'
 GameStore = require './GameStore'
 
-class PerudoManager
+PerudoManager = React.createClass({
 
-    constructor: (options) ->
-        @el = options.el
-
+    componentDidMount: ->
         @pusher = new Pusher('e913cbc1d7c563bff2c0')
         window.pusher = @pusher
-
         @_initRoutes()
 
     _initRoutes: () ->
@@ -35,38 +32,27 @@ class PerudoManager
     _setUrlHash: (hash) =>
         hasher.setHash(hash)
 
-    goToLobby: =>
+    goToLobby: ->
         @_setUrlHash('')
 
-    goToGame: (id) =>
-        @_setUrlHash("game/#{id}")
+    goToGame: (id) ->
+      @_setUrlHash("game/#{id}")
 
-    loadLobby: =>
-        $.getJSON('/game/lobby', @lobbyLoaded)
+    loadLobby: ->
+      $.getJSON('/game/lobby', @lobbyLoaded)
 
-    loadGame: (gameId) =>
-      React.unmountComponentAtNode(@el)
-      @component = GameComponent({
-        id: gameId,
-        handleGoToLobby: @goToLobby,
-        pusher: @pusher,
-      })
-      React.renderComponent(@component, @el)
+    loadGame: (gameId) ->
+      @setState({gameId: gameId, state: 'game'})
 
-    lobbyLoaded: (data) =>
-        games = []
-        for game in data.games
-            games.push({
-                key: game.id,
-                status: game.status
-            })
+    lobbyLoaded: (data) ->
+      games = []
+      for game in data.games
+        games.push({
+          key: game.id,
+          status: game.status
+        })
 
-        React.unmountComponentAtNode(@el)
-        @component = LobbyComponent({
-            onGameSelected: @goToGame,
-            onCreateGame: @onCreateGame,
-            games: games})
-        React.renderComponent(@component, @el)
+      @setState({games: games, state: 'lobby'})
 
     onCreateGame: (nick, numPlayers) =>
         url = "/game/new"
@@ -80,5 +66,23 @@ class PerudoManager
             @loadLobby()
 
         $.post(url, args, onSuccess, "json")
+
+    getInitialState: ->
+      return { state: 'loading' }
+
+    render: ->
+      if @state.state == 'loading'
+        return <span>Loading FiveDice</span>
+      else if @state.state == 'game'
+        return <GameComponent
+          id={ @state.gameId }
+          handleGoToLobby= { @goToLobby }
+          pusher={ @pusher } />
+      else
+        return <LobbyComponent
+          onGameSelected={ @goToGame }
+          onCreateGame={ @onCreateGame }
+          games={ @state.games } />
+})
 
 module.exports = PerudoManager

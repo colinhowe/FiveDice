@@ -1,7 +1,8 @@
+React = require 'react'
 PerudoManager = require './perudo/PerudoManager'
 
 document.addEventListener('DOMContentLoaded', ->
-    game = new PerudoManager({"el": document.getElementById("game")})
+    React.renderComponent(<PerudoManager />, document.getElementById("game"))
 
     # Debugging and tinkering interface
     window.game = game
