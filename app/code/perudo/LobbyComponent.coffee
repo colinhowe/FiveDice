@@ -10,17 +10,11 @@ LobbyComponent = React.createClass({
         - onCreateGame - Callback that should create a game
     ###
 
-    componentWillMount: ->
-        @setState({games: @props.games})
-
-    setGames: (games) ->
-        @setState({games: games})
-
     handleGameChange: (gameId) ->
         @props.onGameSelected(gameId)
 
     render: ->
-        gameNodes = @state.games.map((game) =>
+        gameNodes = @props.games.map((game) =>
             return <LobbyGameRow
                 key={game.key}
                 game={game}

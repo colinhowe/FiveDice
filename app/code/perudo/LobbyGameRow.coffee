@@ -7,14 +7,15 @@ LobbyGameRow = React.createClass({
       that has been selected.
   ###
   componentWillMount: ->
-    @props.secret = localStorage["game:#{@props.key}:secret"]
+    secret = localStorage["game:#{@props.key}:secret"]
+    @setState({secret: secret})
 
   handleClick: (e) ->
     @props.onGameSelected(@props.key)
 
   render: ->
     joinType = "Spectate"
-    if @props.secret
+    if @state.secret
         joinType = "Play"
     gameState = @props.game.status
     gameStateMsg = {

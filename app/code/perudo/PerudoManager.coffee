@@ -54,7 +54,7 @@ PerudoManager = React.createClass({
 
       @setState({games: games, state: 'lobby'})
 
-    onCreateGame: (nick, numPlayers) =>
+    onCreateGame: (nick, numPlayers) ->
         url = "/game/new"
         args = {
             num_players: numPlayers,

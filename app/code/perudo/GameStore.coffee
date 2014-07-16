@@ -1,37 +1,34 @@
 $ = require 'jquery'
-GameModel = require './GameModel'
-PlayerModel = require './PlayerModel'
+
+GAME_WAITING_PLAYERS = 1
+GAME_STARTED = 2
+GAME_ENDED = 3
 
 class GameStore
+
+  _parseDice: (dice) ->
+    dice = dice.split(",")
+    dice = dice.map((d) -> parseInt(d))
+    return dice
+
   fetchById: (id, gameSecret, onSuccess) ->
     url = '/game/' + id
     if gameSecret
         url += "/#{gameSecret}"
     $.getJSON(url, (data) =>
-      game = new GameModel()
+      game = {}
       @_parseGame(game, gameSecret, data)
       if data.player?.dice
-        dice = data.player.dice.split(",")
-        dice = dice.map((d) -> parseInt(d))
+        dice = @_parseDice(data.player.dice)
       if data.player
         localPlayerId = data.player.number
       onSuccess(game, dice, localPlayerId)
     )
 
-  fetchNewDice: (game, onSuccess) ->
-    url = "/game/#{game.id}/#{game.secret}"
-    $.getJSON(url, (data) =>
-      @_parseGame(game, null, data)
-      if data.player
-        dice = data.player.dice.split(",")
-        dice = dice.map((d) -> parseInt(d))
-        onSuccess(dice)
-    )
-
   updateGameWithNewData: (game, data) ->
     # Create a new game and copy local data from the old game as we
     # don't always get given that in updates
-    newGame = new GameModel()
+    newGame = {}
     newGame.localPlayer = game.localPlayer
     newGame.secret = game.secret
     @_parseGame(newGame, null, data)
@@ -40,8 +37,7 @@ class GameStore
   _parseGame: (game, gameSecret, data) ->
     players = {}
     for player in data.game.players
-      player = @_parsePlayer(player)
-      players[player.id] = player
+      players[player.id] = @_parsePlayer(player)
 
     if data.player?
       # If there is a player in the data then that is the current player and
@@ -73,7 +69,12 @@ class GameStore
     if data.game.player_won
       game.winner = players[data.game.player_won]
 
+    game.inProgress = game.status == GAME_STARTED
+    game.waitingForPlayers = game.status == GAME_WAITING_PLAYERS
+    game.canJoin = game.status == GAME_WAITING_PLAYERS and not game.localPlayer
+    game.localPlayersTurn = game.currentPlayer == game.localPlayer and game.inProgress
+
   _parsePlayer: (playerData) ->
-    return new PlayerModel(playerData.number, playerData.nick)
+    return {id: playerData.number, nick: playerData.nick}
 
 module.exports = GameStore
