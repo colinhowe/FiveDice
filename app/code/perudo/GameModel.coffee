@@ -22,4 +22,11 @@ class GameModel
   won: ->
     return @status == GAME_ENDED
 
+  canJoin: ->
+    return @status == GAME_WAITING_PLAYERS and not @localPlayer
+
+  localPlayersTurn: ->
+    return (@currentPlayer == @localPlayer) and @inProgress()
+
+
 module.exports = GameModel

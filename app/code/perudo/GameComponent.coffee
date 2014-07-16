@@ -13,7 +13,8 @@ LastGambleComponent = React.createClass({
 
 PlayerListComponent = React.createClass({
   render: ->
-    playerNodes = @props.players.map((player) ->
+    players = (player for _, player of @props.players)
+    playerNodes = players.map((player) ->
       <li key={player.nick}>{player.nick}</li>
     )
     return <ul>{ playerNodes }</ul>
@@ -24,9 +25,14 @@ GambleComponent = React.createClass({
     <div>
       <input ref="quantity" type="number" placeholder="number of dice" />
       <input ref="value" type="number" placeholder="value of dice" />
-      <button onClick={@props.doGamble}>Gamble</button>
-      <button onClick={@props.doBullshit}>Call Bullshit</button>
+      <button onClick={@doGamble}>Gamble</button>
+      <button onClick={@doBullshit}>Call Bullshit</button>
     </div>
+
+  doGamble: ->
+    value = parseInt(@refs.value.getDOMNode().value.trim())
+    quantity = parseInt(@refs.quantity.getDOMNode().value.trim())
+    @props.doGamble(value, quantity)
 })
 
 GameComponent = React.createClass({
@@ -35,12 +41,12 @@ GameComponent = React.createClass({
         return
       data = JSON.parse(data)
 
-      currentRound = @game.round
-      currentStatus = @game.status
-      new GameStore().updateGameWithNewData(@game, data)
-      gameJustStarted = @game.status != currentStatus and @game.inProgress()
-      if @game.round != currentRound or gameJustStarted
-        new GameStore().fetchNewDice(@game, @gotNewDice)
+      currentRound = @state.game.round
+      currentStatus = @state.game.status
+      new GameStore().updateGameWithNewData(@state.game, data)
+      gameJustStarted = @state.game.status != currentStatus and @state.game.inProgress()
+      if @state.game.round != currentRound or gameJustStarted
+        new GameStore().fetchNewDice(@state.game, @gotNewDice)
       else
         @syncState()
 
@@ -49,25 +55,10 @@ GameComponent = React.createClass({
       @syncState()
 
     syncState: ->
-        inProgress = @game.inProgress()
-        yourTurn = false
-        if @localPlayerId and inProgress
-            yourTurn = @localPlayerId == @game.currentPlayer.id
-
-        if @localPlayerId
-          localPlayer = @game.players[@localPlayerId]
         newState = {
-            inProgress: inProgress,
             dice: @dice,
-            localPlayer: localPlayer,
-            currentPlayer: @game.currentPlayer,
-            players: (player for _, player of @game.players),
-            canJoin: @game.waitingForPlayers(),
-            yourTurn: yourTurn,
-            lastGamble: @game.lastGamble,
-            round: @game.round,
-            winner: @game.winner,
-            loading: false
+            loading: false,
+            game: @state.game
         }
         @setState(newState)
 
@@ -84,7 +75,7 @@ GameComponent = React.createClass({
       new GameStore().fetchById(gameId, secret, @gameLoaded)
 
     gameLoaded: (game, dice, localPlayerId) ->
-      @game = game
+      @setState({game: game})
       @localPlayerId = localPlayerId
       @dice = dice
 
@@ -103,31 +94,32 @@ GameComponent = React.createClass({
         if @state.loading
           return <p>Loading...</p>
 
-        playerList = <PlayerListComponent players={@state.players} />
+        playerList = <PlayerListComponent players={@state.game.players} />
 
-        if @state.winner
-          winnerBlock = <h1>{ @state.winner.nick } has won!</h1>
+        if @state.game.winner
+          winnerBlock = <h1>{ @state.game.winner.nick } has won!</h1>
 
-        if @state.canJoin and not @state.localPlayer
+        if @state.game.canJoin()
           joinBlock = <div>
             <input type="text" ref="nick" placeholder="Your nick" />
             <button onClick={@onJoin}>Join game</button>
           </div>
-        else if @state.canJoin
+        else if @state.game.waitingForPlayers()
           joinBlock = <p>Waiting for more players to join</p>
 
         if @state.dice
             diceBlock = <Dice dice={@state.dice} />
-            if @state.localPlayer == @state.currentPlayer
-                gambleBlock = <GambleComponent
-                  doGamble={@doGamble} doBullshit={@doBullshit} />
 
-        if @state.lastGamble
-          lastGambleBlock = <LastGambleComponent lastGamble={@state.lastGamble} />
+        if @state.game.localPlayersTurn()
+          gambleBlock = <GambleComponent
+              doGamble={@doGamble} doBullshit={@doBullshit} />
+
+        if @state.game.lastGamble
+          lastGambleBlock = <LastGambleComponent lastGamble={@state.game.lastGamble} />
 
         return <div>
                 <button onClick={@props.handleGoToLobby}>Back</button>
-                <h2>Round { @state.round }</h2>
+                <h2>Round { @state.game.round }</h2>
                 { playerList }
                 { winnerBlock }
                 { joinBlock }
@@ -141,12 +133,12 @@ GameComponent = React.createClass({
       onSuccess = (data) =>
         secret = data.player.secret
         @setProps({secret: secret})
-        @game.secret = secret
+        @state.game.secret = secret
         localStorage["game:#{data.game.id}:secret"] = secret
 
         gs = new GameStore()
-        gs.updateGameWithNewData(@game, data)
-        gs.fetchNewDice(@game, @gotNewDice)
+        gs.updateGameWithNewData(@state.game, data)
+        gs.fetchNewDice(@state.game, @gotNewDice)
         
       args = {
         nick: nick
@@ -154,13 +146,11 @@ GameComponent = React.createClass({
       url = "/game/#{@props.id}/join"
       $.post(url, args, onSuccess, "json")
 
-    doGamble: ->
-        value = parseInt(@refs.value.getDOMNode().value.trim())
-        quantity = parseInt(@refs.quantity.getDOMNode().value.trim())
+    doGamble: (value, quantity) ->
         url = "/game/#{@props.id}/#{@props.secret}/do_turn"
         arg = "gamble=#{quantity},#{value}"
         onSuccess = (data) =>
-          new GameStore().updateGameWithNewData(@game, data)
+          new GameStore().updateGameWithNewData(@state.game, data)
           @syncState()
         $.post(url, arg, onSuccess, "json")
 

@@ -40,12 +40,13 @@ class GameStore
     if data.player?
       # If there is a player in the data then that is the current player and
       # contains more information about the state so use that instead
-      localPlayer = @_parsePlayer(data.player)
-      players[localPlayer.id] = localPlayer
+      game.localPlayer = @_parsePlayer(data.player)
+
+    if game.localPlayer
+      players[game.localPlayer.id] = game.localPlayer
     
     game.id = data.game.id
     game.players = players
-    game.localPlayer = localPlayer
     if gameSecret
       game.secret = gameSecret
     game.round = data.game.round
