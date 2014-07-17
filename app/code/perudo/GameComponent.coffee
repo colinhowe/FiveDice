@@ -4,6 +4,8 @@ React = require 'react'
 Dice = require './Dice'
 GameStore = require './GameStore'
 
+GameActions = require './GameActions'
+
 LastGambleComponent = React.createClass({
   render: ->
     return <div>
@@ -39,21 +41,33 @@ GambleComponent = React.createClass({
 })
 
 GameComponent = React.createClass({
-    onEventPushed: (eventName, data) ->
-      if typeof data == "object"
-        return
-      data = JSON.parse(data)
-
+    _onGameChanged: (newGameState) ->
+      # Copy local data from the old game as we don't always get given that in
+      # updates
       currentRound = @state.game.round
       currentStatus = @state.game.status
 
-      @_syncGame(data)
+      if @state.game.localPlayer
+        newGameState.localPlayer = @state.game.localPlayer
+      newGameState.updateState()
 
-      if @state.game.round != currentRound or @state.game.status != currentStatus
-        new GameStore().fetchById(@state.game.id, @state.game.secret, @gotNewDice)
+      if newGameState.secret and not @state.secret
+        localStorage["game:#{newGameState.id}:secret"] = newGameState.secret
+        @setState({secret: newGameState.secret, game: newGameState})
+      else:
+        @setState({game: newGameState})
+
+      needDice = (
+        @state.game.round != currentRound or
+        @state.game.status != currentStatus or
+        (@state.secret and !@state.dice and @state.game.inProgress)
+      )
+
+      if needDice
+        GameStore.fetchById(@state.game.id, @state.secret, @gotNewDice)
 
     _syncGame: (data) ->
-      game = new GameStore().updateGameWithNewData(@state.game, data)
+      game = GameStore.updateGameWithNewData(@state.game, data)
       @setState(game: game)
 
     gotNewDice: (game, dice, localPlayerId) ->
@@ -68,20 +82,18 @@ GameComponent = React.createClass({
       gameId = @props.id
       secret = localStorage["game:#{gameId}:secret"]
       @setState({secret: secret})
+      window.game = @
 
-      new GameStore().fetchById(gameId, secret, @gameLoaded)
+      GameStore.fetchById(gameId, secret, @gameLoaded)
 
     gameLoaded: (game, dice, localPlayerId) ->
       @setState({loading: false, game: game, dice: dice})
-
-      channelName = "fivedice.game.#{@props.id}"
-      pusher = @props.pusher
-      channel = pusher.subscribe(channelName)
-      channel.bind_all(@onEventPushed)
+      GameStore.watch(@props.pusher, game.id)
+      GameStore.subscribe(@_onGameChanged)
 
     componentWillUnmount: ->
-      channel = "fivedice.game.#{@props.id}"
-      @props.pusher.unsubscribe(channel)
+      GameStore.unwatch(@props.pusher, @state.game.id)
+      GameStore.unsubscribe(@_onGameChanged)
 
     render: ->
         if @state.loading
@@ -123,32 +135,13 @@ GameComponent = React.createClass({
 
     onJoin: ->
       nick = @refs.nick.getDOMNode().value.trim()
-      onSuccess = (data) =>
-        secret = data.player.secret
-        @setState({secret: secret})
-        @state.game.secret = secret
-        localStorage["game:#{data.game.id}:secret"] = secret
-
-        @_syncGame(data)
-        new GameStore().fetchById(@state.game.id, @state.game.secret, @gotNewDice)
-        
-      args = {
-        nick: nick
-      }
-      url = "/game/#{@props.id}/join"
-      $.post(url, args, onSuccess, "json")
+      GameActions.Join.send(@props.id, nick)
 
     doGamble: (value, quantity) ->
-        url = "/game/#{@props.id}/#{@state.secret}/do_turn"
-        arg = "gamble=#{quantity},#{value}"
-        $.post(url, arg, @_syncGame, "json")
+      GameActions.Gamble.send(@props.id, @state.secret, value, quantity)
 
     doBullshit: ->
-        url = "/game/#{@props.id}/#{@state.secret}/do_turn"
-        arg = "gamble=bullshit"
-        onSuccess = (data) =>
-            # Do some state
-        $.post(url, arg, onSuccess, "text")
+      GameActions.Bullshit.send(@props.id, @state.secret)
 })
 
 module.exports = GameComponent

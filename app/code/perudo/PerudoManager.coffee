@@ -55,17 +55,17 @@ PerudoManager = React.createClass({
       @setState({games: games, state: 'lobby'})
 
     onCreateGame: (nick, numPlayers) ->
-        url = "/game/new"
-        args = {
-            num_players: numPlayers,
-            nick: nick
-        }
-        onSuccess = (data) =>
-            # Record the game secret for later use
-            localStorage["game:#{data.game.id}:secret"] = data.player.secret
-            @loadLobby()
+      url = "/game/new"
+      args = {
+        num_players: numPlayers,
+        nick: nick
+      }
+      onSuccess = (data) =>
+        # Record the game secret for later use
+        localStorage["game:#{data.game.id}:secret"] = data.player.secret
+        @goToGame(data.game.id)
 
-        $.post(url, args, onSuccess, "json")
+      $.post(url, args, onSuccess, "json")
 
     getInitialState: ->
       return { state: 'loading' }
