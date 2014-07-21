@@ -1,10 +1,10 @@
-$ = require 'jquery'
 React = require 'react'
 
 Dice = require './Dice'
 GameStore = require './GameStore'
 
 GameActions = require './GameActions'
+GambleComponent = require './GambleComponent'
 
 LastGambleComponent = React.createClass({
   render: ->
@@ -22,25 +22,15 @@ PlayerListComponent = React.createClass({
     return <ul>{ playerNodes }</ul>
 })
 
-GambleComponent = React.createClass({
-  render: ->
-    <div>
-      <input ref="quantity" type="number" placeholder="number of dice" />
-      <input ref="value" type="number" placeholder="value of dice" />
-      <button onClick={@doGamble}>Gamble</button>
-      <button onClick={@doBullshit}>Call Bullshit</button>
-    </div>
-
-  doGamble: ->
-    value = parseInt(@refs.value.getDOMNode().value.trim())
-    quantity = parseInt(@refs.quantity.getDOMNode().value.trim())
-    @props.doGamble(value, quantity)
-
-  doBullshit: ->
-    @props.doBullshit()
-})
-
 GameComponent = React.createClass({
+    _secretSent: (gameId, secret) ->
+      if @state.game.id != gameId
+        return
+
+      localStorage["game:#{@state.game.id}:secret"] = secret
+      @setState({secret: secret})
+      @_getDiceIfNeeded(null, null)
+
     _onGameChanged: (newGameState) ->
       # Copy local data from the old game as we don't always get given that in
       # updates
@@ -51,24 +41,24 @@ GameComponent = React.createClass({
         newGameState.localPlayer = @state.game.localPlayer
       newGameState.updateState()
 
-      if newGameState.secret and not @state.secret
-        localStorage["game:#{newGameState.id}:secret"] = newGameState.secret
-        @setState({secret: newGameState.secret, game: newGameState})
-      else:
-        @setState({game: newGameState})
+      @setState({game: newGameState})
+      @_getDiceIfNeeded()
 
-      needDice = (
-        @state.game.round != currentRound or
-        @state.game.status != currentStatus or
-        (@state.secret and !@state.dice and @state.game.inProgress)
-      )
+    _getDiceIfNeeded: (currentRound, currentStatus) ->
+
+      needDice = false
+
+      if currentRound and @state.game.round != currentRound
+        needDice = true
+
+      if currentStatus and @state.game.status != currentStatus
+        needDice = true
+
+      if @state.secret and !@state.dice and @state.game.inProgress
+        needDice = true
 
       if needDice
         GameStore.fetchById(@state.game.id, @state.secret, @gotNewDice)
-
-    _syncGame: (data) ->
-      game = GameStore.updateGameWithNewData(@state.game, data)
-      @setState(game: game)
 
     gotNewDice: (game, dice, localPlayerId) ->
       @setState({dice: dice})
@@ -90,10 +80,12 @@ GameComponent = React.createClass({
       @setState({loading: false, game: game, dice: dice})
       GameStore.watch(@props.pusher, game.id)
       GameStore.subscribe(@_onGameChanged)
+      GameStore.subscribeSecret(@_secretSent)
 
     componentWillUnmount: ->
       GameStore.unwatch(@props.pusher, @state.game.id)
       GameStore.unsubscribe(@_onGameChanged)
+      GameStore.unsubscribeSecret(@_secretSent)
 
     render: ->
         if @state.loading

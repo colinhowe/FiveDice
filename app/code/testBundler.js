@@ -1,0 +1,1 @@
+require("./perudo/GameComponentSpec");

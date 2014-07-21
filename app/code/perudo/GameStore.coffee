@@ -10,6 +10,7 @@ class GameStore
 
   constructor: ->
     @subscribers = []
+    @secretSubscribers = []
     GameActions.Gamble.subscribe(@, @onGamble)
     GameActions.Bullshit.subscribe(@, @onBullshit)
     GameActions.Join.subscribe(@, @onJoin)
@@ -25,7 +26,7 @@ class GameStore
         url += "/#{gameSecret}"
     $.getJSON(url, (data) =>
       game = {}
-      @_parseGame(game, gameSecret, data)
+      @_parseGame(game, data)
       if data.player?.dice
         dice = @_parseDice(data.player.dice)
       if data.player
@@ -33,16 +34,7 @@ class GameStore
       onSuccess(game, dice, localPlayerId)
     )
 
-  updateGameWithNewData: (game, data) ->
-    # Create a new game and copy local data from the old game as we
-    # don't always get given that in updates
-    newGame = {}
-    newGame.localPlayer = game.localPlayer
-    newGame.secret = game.secret
-    @_parseGame(newGame, null, data)
-    return newGame
-
-  _parseGame: (game, gameSecret, data) ->
+  _parseGame: (game, data) ->
     players = {}
     for player in data.game.players
       players[player.number] = @_parsePlayer(player)
@@ -55,9 +47,7 @@ class GameStore
     game.id = data.game.id
     game.players = players
     if data.player?.secret
-      game.secret = data.player.secret
-    if gameSecret
-      game.secret = gameSecret
+      @_secretSent(data.player.secret)
     game.round = data.game.round
     game.status = data.game.status
 
@@ -101,16 +91,26 @@ class GameStore
 
   _gameChanged: (data) =>
     game = {}
-    @_parseGame(game, null, data)
+    @_parseGame(game, data)
 
     for subscriber in @subscribers
       subscriber(game)
+
+  _secretSent: (gameId, secret) =>
+    for subscriber in @secretSubscribers
+      subscriber(gameId, secret)
 
   subscribe: (cb) ->
     @subscribers.push(cb)
 
   unsubscribe: (cb) ->
     @subscribers = @subscribers.filter((cb2) -> cb2 != cb)
+
+  subscribeSecret: (cb) ->
+    @secretSubscribers.push(cb)
+
+  unsubscribeSecret: (cb) ->
+    @secretSubscribers = @secretSubscribers.filter((cb2) -> cb2 != cb)
 
   watch: (pusher, gameId) ->
     channelName = "fivedice.game.#{gameId}"
